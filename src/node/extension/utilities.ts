@@ -4,7 +4,7 @@
 
 'use strict';
 
-import * as vscode from 'vscode';
+// import * as vscode from 'vscode';
 import * as FS from 'fs';
 
 export class Logger {
@@ -18,7 +18,8 @@ export class Logger {
  * Send to debug console.
  */
 export function writeToConsole(message: string) {
-	vscode.debug.activeDebugConsole.appendLine(message);
+	// vscode.debug.activeDebugConsole.appendLine(message);
+	console.log(message);
 }
 
 /**

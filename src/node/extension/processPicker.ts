@@ -4,134 +4,136 @@
 
 'use strict';
 
-import * as nls from 'vscode-nls';
-import * as vscode from 'vscode';
+// import * as nls from 'vscode-nls';
+//import * as vscode from 'vscode';
 import { basename } from 'path';
 import { getProcesses } from './processTree';
 import { execSync } from 'child_process';
 import { detectProtocolForPid, INSPECTOR_PORT_DEFAULT, LEGACY_PORT_DEFAULT } from './protocolDetection';
 import { analyseArguments } from './protocolDetection';
 
-const localize = nls.loadMessageBundle();
+const localize = function(...args: any[]) : string {
+	return 'na';
+}; // nls.loadMessageBundle();
 
 //---- extension.pickNodeProcess
 
-interface ProcessItem extends vscode.QuickPickItem {
-	pidOrPort: string;	// picker result
-	sortKey: number;
-}
-
-/**
- * end user action for picking a process and attaching debugger to it
- */
-export async function attachProcess() {
-
-	const config = {
-		type: 'node',
-		request: 'attach',
-		name: 'process',
-		processId: '${command:extension.pickNodeProcess}'
-	};
-
-	if (!await resolveProcessId(config)) {
-		return vscode.debug.startDebugging(undefined, config);
-	}
-	return undefined;
-}
-
-/**
- * returns true if UI was cancelled
- */
-export async function resolveProcessId(config: vscode.DebugConfiguration) : Promise<boolean> {
-
-	// we resolve Process Picker early (before VS Code) so that we can probe the process for its protocol
-	let processId = config.processId.trim();
-	if (processId === '${command:PickProcess}' || processId === '${command:extension.pickNodeProcess}') {
-		const result = await pickProcess(true);	// ask for pids and ports!
-		if (!result) {
-			// UI dismissed (cancelled)
-			return true;
-		}
-		processId = result;
-	}
-
-	const matches = /^(inspector|legacy)?([0-9]+)(inspector|legacy)?([0-9]+)?$/.exec(processId);
-	if (matches && matches.length === 5) {
-
-		if (matches[2] && matches[3] && matches[4]) {
-
-			// process id and protocol and port
-
-			const pid = Number(matches[2]);
-			putPidInDebugMode(pid);
-
-			// debug port
-			config.port = Number(matches[4]);
-			config.protocol = matches[3];
-			delete config.processId;
-
-		} else {
-
-			// protocol and port
-			if (matches[1]) {
-
-				// debug port
-				config.port = Number(matches[2]);
-				config.protocol = matches[1];
-				delete config.processId;
-
-			} else {
-
-				// process id
-				const pid = Number(matches[2]);
-				putPidInDebugMode(pid);
-
-				const debugType = await determineDebugTypeForPidInDebugMode(config, pid);
-				if (debugType) {
-					// processID is handled, so turn this config into a normal port attach configuration
-					delete config.processId;
-					config.port = debugType === 'node2' ? INSPECTOR_PORT_DEFAULT : LEGACY_PORT_DEFAULT;
-					config.protocol = debugType === 'node2' ? 'inspector' : 'legacy';
-				} else {
-					throw new Error(localize('pid.error', "Attach to process: cannot put process '{0}' in debug mode.", processId));
-				}
-			}
-		}
-
-	} else {
-		throw new Error(localize('process.id.error', "Attach to process: '{0}' doesn't look like a process id.", processId));
-	}
-
-	return false;
-}
-
-/**
- * Process picker command (for launch config variable)
- * Returns as a string with these formats:
- * - "12345": process id
- * - "inspector12345": port number and inspector protocol
- * - "legacy12345": port number and legacy protocol
- * - null: abort launch silently
- */
-export function pickProcess(ports?): Promise<string | null> {
-
-	return listProcesses(ports).then(items => {
-		let options: vscode.QuickPickOptions = {
-			placeHolder: localize('pickNodeProcess', "Pick the node.js process to attach to"),
-			matchOnDescription: true,
-			matchOnDetail: true
-		};
-		return vscode.window.showQuickPick(items, options).then(item => item ? item.pidOrPort : null);
-	}).catch(err => {
-		return vscode.window.showErrorMessage(localize('process.picker.error', "Process picker failed ({0})", err.message), { modal: true }).then(_ => null);
-	});
-}
+// interface ProcessItem extends vscode.QuickPickItem {
+// 	pidOrPort: string;	// picker result
+// 	sortKey: number;
+// }
+//
+// /**
+//  * end user action for picking a process and attaching debugger to it
+//  */
+// export async function attachProcess() {
+//
+// 	const config = {
+// 		type: 'node',
+// 		request: 'attach',
+// 		name: 'process',
+// 		processId: '${command:extension.pickNodeProcess}'
+// 	};
+//
+// 	if (!await resolveProcessId(config)) {
+// 		return vscode.debug.startDebugging(undefined, config);
+// 	}
+// 	return undefined;
+// }
+//
+// /**
+//  * returns true if UI was cancelled
+//  */
+// export async function resolveProcessId(config: vscode.DebugConfiguration) : Promise<boolean> {
+//
+// 	// we resolve Process Picker early (before VS Code) so that we can probe the process for its protocol
+// 	let processId = config.processId.trim();
+// 	if (processId === '${command:PickProcess}' || processId === '${command:extension.pickNodeProcess}') {
+// 		const result = await pickProcess(true);	// ask for pids and ports!
+// 		if (!result) {
+// 			// UI dismissed (cancelled)
+// 			return true;
+// 		}
+// 		processId = result;
+// 	}
+//
+// 	const matches = /^(inspector|legacy)?([0-9]+)(inspector|legacy)?([0-9]+)?$/.exec(processId);
+// 	if (matches && matches.length === 5) {
+//
+// 		if (matches[2] && matches[3] && matches[4]) {
+//
+// 			// process id and protocol and port
+//
+// 			const pid = Number(matches[2]);
+// 			putPidInDebugMode(pid);
+//
+// 			// debug port
+// 			config.port = Number(matches[4]);
+// 			config.protocol = matches[3];
+// 			delete config.processId;
+//
+// 		} else {
+//
+// 			// protocol and port
+// 			if (matches[1]) {
+//
+// 				// debug port
+// 				config.port = Number(matches[2]);
+// 				config.protocol = matches[1];
+// 				delete config.processId;
+//
+// 			} else {
+//
+// 				// process id
+// 				const pid = Number(matches[2]);
+// 				putPidInDebugMode(pid);
+//
+// 				const debugType = await determineDebugTypeForPidInDebugMode(config, pid);
+// 				if (debugType) {
+// 					// processID is handled, so turn this config into a normal port attach configuration
+// 					delete config.processId;
+// 					config.port = debugType === 'node2' ? INSPECTOR_PORT_DEFAULT : LEGACY_PORT_DEFAULT;
+// 					config.protocol = debugType === 'node2' ? 'inspector' : 'legacy';
+// 				} else {
+// 					throw new Error(localize('pid.error', "Attach to process: cannot put process '{0}' in debug mode.", processId));
+// 				}
+// 			}
+// 		}
+//
+// 	} else {
+// 		throw new Error(localize('process.id.error', "Attach to process: '{0}' doesn't look like a process id.", processId));
+// 	}
+//
+// 	return false;
+// }
+//
+// /**
+//  * Process picker command (for launch config variable)
+//  * Returns as a string with these formats:
+//  * - "12345": process id
+//  * - "inspector12345": port number and inspector protocol
+//  * - "legacy12345": port number and legacy protocol
+//  * - null: abort launch silently
+//  */
+// export function pickProcess(ports?): Promise<string | null> {
+//
+// 	return listProcesses(ports).then(items => {
+// 		let options: vscode.QuickPickOptions = {
+// 			placeHolder: localize('pickNodeProcess', "Pick the node.js process to attach to"),
+// 			matchOnDescription: true,
+// 			matchOnDetail: true
+// 		};
+// 		return vscode.window.showQuickPick(items, options).then(item => item ? item.pidOrPort : null);
+// 	}).catch(err => {
+// 		return vscode.window.showErrorMessage(localize('process.picker.error', "Process picker failed ({0})", err.message), { modal: true }).then(_ => null);
+// 	});
+// }
 
 //---- private
 
-function listProcesses(ports: boolean): Promise<ProcessItem[]> {
+export function listProcesses(ports: boolean): Promise<any[]> {
 
-	const items: ProcessItem[] = [];
+	const items: any[] = [];
 
 	const NODE = new RegExp('^(?:node|iojs)$', 'i');
 
